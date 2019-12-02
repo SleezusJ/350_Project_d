@@ -1,0 +1,57 @@
+//load the directory(sec2) and map(sec1) into corresponding arrays
+	interrupt(0x21,2,map,1,0);
+	interrupt(0x21,2,dir,2,0);
+
+	//search directory for available entries
+	for(fileEntry=0;fileEntry<512;fileEntry+=32){
+		if(dir[fileEntry]!=0x0){
+			continue;
+		}else{
+			//add filename to directory entry
+			//fill entry with zeros, protecting against short filenames
+			for(i=0;i<6;i++){dir[fileEntry+i] = 0x0;}
+			//copy filename to directory entry
+			for(i=0;i<6;i++){dir[fileEntry+i] = filename[i];}
+			i=6; //explicitly set i to 6			
+
+			//for each sector to write 
+			for(j=0;j<numberOfSectors;j++){
+
+				//fill corresponding buffer segment
+				for(l=0;l<512;l++){
+					bufferSegment[i] = buffer[(512*j)+i];
+				}				
+	
+				//search map for free sectors
+				for(k=3;k<512;k++){
+					if(map[k]==0x0){  //if sector empty
+						map[k]=0xFF; //mark full
+						dir[fileEntry+i]=k; //set directory entry to the found sector number
+						i++; //increment i for next iteration
+												
+						interrupt(0x21,6,bufferSegment,k,0);//write bufferSegment to found sector
+						
+						
+					}
+					if(k==511){return;}
+				}
+						
+			}
+			//Fill in the remaining bytes in the directory entry to 0 
+			if(numberOfSectors!=32){
+				for(i;i<32;i++){
+					dir[fileEntry + i] = 0x0;
+				}
+			}
+
+			//Write the Map and Directory sectors back to the disk 
+			interrupt(0x21,6,map,1,0);
+			interrupt(0x21,6,dir,2,0);
+			//break out of loop
+			return;
+		}
+
+	}
+	//if no open directory entries, return
+	return;
+
